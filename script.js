@@ -770,6 +770,12 @@ async function baixarRelatorioWhatsapp(){
         0
     );
 
+    const totalSemLeitura =
+    dadosEstacoes.reduce(
+        (s,d) => s + d.semLeitura,
+        0
+    );
+
     const pctRejeitos =
     totalLido
     ? (totalRejeitos / totalLido * 100)
@@ -782,7 +788,9 @@ async function baixarRelatorioWhatsapp(){
     agregarMotivos(dadosRejeitos);
 
     const linhasMotivos =
-    montarLinhasMotivosCanonicos(motivos, totalRejeitos);
+    montarLinhasMotivosCanonicos(motivos, totalRejeitos)
+        .slice()
+        .sort((a,b) => b.qtd - a.qtd);
 
     const fmt = n => n.toLocaleString("pt-BR");
 
@@ -962,7 +970,7 @@ async function baixarRelatorioWhatsapp(){
         <!-- KPIs -->
         <div style="
             display:flex;
-            gap:10px;
+            gap:8px;
             padding:20px 20px 4px;
         ">
 
@@ -971,19 +979,19 @@ async function baixarRelatorioWhatsapp(){
                 background:${LINHA_PAR};
                 border:1px solid ${BORDA};
                 border-radius:12px;
-                padding:14px 12px;
+                padding:12px 8px;
                 text-align:center;
             ">
                 <div style="
-                    font-size:10px;
+                    font-size:9px;
                     font-weight:700;
-                    letter-spacing:.05em;
+                    letter-spacing:.04em;
                     text-transform:uppercase;
                     color:${TEXTO_MUTED};
                 ">Total Lido</div>
                 <div style="
                     font-family:'Oswald','Segoe UI',Arial,sans-serif;
-                    font-size:24px;
+                    font-size:21px;
                     font-weight:600;
                     color:${TEXTO};
                     margin-top:4px;
@@ -992,22 +1000,46 @@ async function baixarRelatorioWhatsapp(){
 
             <div style="
                 flex:1;
-                background:${VERMELHO_BG};
-                border:1px solid ${VERMELHO_BG};
+                background:${LINHA_PAR};
+                border:1px solid ${BORDA};
                 border-radius:12px;
-                padding:14px 12px;
+                padding:12px 8px;
                 text-align:center;
             ">
                 <div style="
-                    font-size:10px;
+                    font-size:9px;
                     font-weight:700;
-                    letter-spacing:.05em;
+                    letter-spacing:.04em;
+                    text-transform:uppercase;
+                    color:${TEXTO_MUTED};
+                ">Sem Leitura</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:21px;
+                    font-weight:600;
+                    color:${TEXTO};
+                    margin-top:4px;
+                ">${fmt(totalSemLeitura)}</div>
+            </div>
+
+            <div style="
+                flex:1;
+                background:${VERMELHO_BG};
+                border:1px solid ${VERMELHO_BG};
+                border-radius:12px;
+                padding:12px 8px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:9px;
+                    font-weight:700;
+                    letter-spacing:.04em;
                     text-transform:uppercase;
                     color:${VERMELHO_TXT};
                 ">Rejeitos</div>
                 <div style="
                     font-family:'Oswald','Segoe UI',Arial,sans-serif;
-                    font-size:24px;
+                    font-size:21px;
                     font-weight:600;
                     color:${VERMELHO_TXT};
                     margin-top:4px;
@@ -1019,19 +1051,19 @@ async function baixarRelatorioWhatsapp(){
                 background:${corStatusBg};
                 border:1px solid ${corStatusBg};
                 border-radius:12px;
-                padding:14px 12px;
+                padding:12px 8px;
                 text-align:center;
             ">
                 <div style="
-                    font-size:10px;
+                    font-size:9px;
                     font-weight:700;
-                    letter-spacing:.05em;
+                    letter-spacing:.04em;
                     text-transform:uppercase;
                     color:${corStatusTxt};
                 ">% Rejeito</div>
                 <div style="
                     font-family:'Oswald','Segoe UI',Arial,sans-serif;
-                    font-size:24px;
+                    font-size:21px;
                     font-weight:600;
                     color:${corStatusTxt};
                     margin-top:4px;
@@ -1167,6 +1199,34 @@ async function baixarRelatorioWhatsapp(){
 
     document.body.appendChild(card);
 
+    const botao =
+    document.getElementById("btnExportarWhatsapp");
+
+    const rotuloOriginal =
+    botao ? botao.innerHTML : null;
+
+    const nomeArquivo =
+    `rejeitos-${cd.replace(/\s+/g,"-").toLowerCase()}-${dataRef.replace(/\//g,"-")}.png`;
+
+    function baixarBlob(blob){
+
+        const link =
+        document.createElement("a");
+
+        link.download = nomeArquivo;
+
+        link.href =
+        URL.createObjectURL(blob);
+
+        link.click();
+
+        setTimeout(
+            () => URL.revokeObjectURL(link.href),
+            5000
+        );
+
+    }
+
     try{
 
         const canvas = await html2canvas(
@@ -1177,16 +1237,66 @@ async function baixarRelatorioWhatsapp(){
             }
         );
 
-        const link =
-        document.createElement("a");
+        const blob = await new Promise(
+            resolve => canvas.toBlob(resolve, "image/png")
+        );
 
-        link.download =
-        `rejeitos-${cd.replace(/\s+/g,"-").toLowerCase()}-${dataRef.replace(/\//g,"-")}.png`;
+        if(!blob){
 
-        link.href =
-        canvas.toDataURL("image/png");
+            throw new Error(
+                "Falha ao gerar a imagem do relatório."
+            );
 
-        link.click();
+        }
+
+        if(navigator.clipboard && window.ClipboardItem){
+
+            try{
+
+                await navigator.clipboard.write([
+                    new ClipboardItem({ "image/png": blob })
+                ]);
+
+                if(botao){
+
+                    botao.innerHTML =
+                    "✅ Copiado! Cole no WhatsApp (Ctrl+V)";
+
+                    setTimeout(()=>{
+
+                        botao.innerHTML = rotuloOriginal;
+
+                    }, 3500);
+
+                }else{
+
+                    alert(
+                        "Relatório copiado! Cole no WhatsApp com Ctrl+V."
+                    );
+
+                }
+
+            }catch(erroClipboard){
+
+                console.error(erroClipboard);
+
+                baixarBlob(blob);
+
+                alert(
+                    "Não foi possível copiar automaticamente. O relatório foi baixado como imagem."
+                );
+
+            }
+
+        }else{
+
+            baixarBlob(blob);
+
+            alert(
+                "Seu navegador não suporta copiar imagens. O relatório foi baixado."
+            );
+
+        }
 
     }catch(erro){
 
