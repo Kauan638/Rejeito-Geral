@@ -25,6 +25,22 @@ const PALETA_MOTIVOS = [
     CORES.roxo, CORES.ciano, CORES.green
 ];
 
+// Lista fixa de motivos de rejeição (ordem do relatório oficial).
+// Motivos encontrados no arquivo que não estejam aqui são
+// adicionados automaticamente ao final, nada é descartado.
+const MOTIVOS_CANONICOS = [
+    { codigo: "SEM_ROTA",                label: "SEM ROTA" },
+    { codigo: "VOLUME_NAO_INTEGRADO",     label: "VOLUME NÃO INTEGRADO" },
+    { codigo: "NOREAD",                   label: "NOREAD" },
+    { codigo: "RAMPA_CHEIA",              label: "RAMPA CHEIA" },
+    { codigo: "STATUS_INVALIDO",          label: "STATUS INVÁLIDO" },
+    { codigo: "NA_RAMPA",                 label: "NA RAMPA" },
+    { codigo: "PERCA_DE_TRACKING",        label: "PERDA DE TRACKING" },
+    { codigo: "NAO_RECEBEU_DLST",         label: "NÃO RECEBEU DLST" },
+    { codigo: "REJEITO_GERAL",            label: "REJEITO GERAL" },
+    { codigo: "CODIGO_PRODUTO_INVALIDO",  label: "CÓDIGO PRODUTO INVÁLIDO" }
+];
+
 
 // ========================================
 // UTILITÁRIOS
@@ -468,6 +484,53 @@ function renderizarTudo(){
     document.getElementById("resultado")
     .classList.remove("oculto");
 
+    // -------- PRÉ-PREENCHER DATA DE REFERÊNCIA --------
+
+    const campoData =
+    document.getElementById("configData");
+
+    if(!campoData.value){
+
+        const dataBase =
+        dadosEstacoes.length
+        ? dadosEstacoes[0].data
+        : (dadosRejeitos[0] ? dadosRejeitos[0].data : "");
+
+        campoData.value =
+        formatarDataCurta(dataBase);
+
+    }
+
+}
+
+function formatarDataCurta(data){
+
+    if(!data){
+
+        return "";
+
+    }
+
+    // Formato "2026-07-01" (Estações) -> "01/07/26"
+    if(/^\d{4}-\d{2}-\d{2}/.test(data)){
+
+        const [ano, mes, dia] = data.split("-");
+
+        return `${dia}/${mes}/${ano.slice(2)}`;
+
+    }
+
+    // Formato "01/07/2026" (Rejeitos) -> "01/07/26"
+    if(/^\d{2}\/\d{2}\/\d{4}/.test(data)){
+
+        const [dia, mes, ano] = data.split("/");
+
+        return `${dia}/${mes}/${ano.slice(2)}`;
+
+    }
+
+    return data;
+
 }
 
 function renderizarAlerta(motivos, totalSemLeitura){
@@ -624,5 +687,410 @@ function renderizarGraficoHora(porHora){
         }
 
     });
+
+}
+
+
+// ========================================
+// RELATÓRIO WHATSAPP (imagem no estilo REJEITOS CD)
+// ========================================
+
+function montarLinhasMotivosCanonicos(motivosAgregados, totalRejeitos){
+
+    const mapaEncontrados = {};
+
+    motivosAgregados.forEach(m=>{
+
+        mapaEncontrados[m.codigo] = m.total;
+
+    });
+
+    const usados = new Set();
+
+    const linhas = MOTIVOS_CANONICOS.map(mc=>{
+
+        usados.add(mc.codigo);
+
+        const qtd =
+        mapaEncontrados[mc.codigo] || 0;
+
+        return { label: mc.label, qtd };
+
+    });
+
+    // Motivos que apareceram no arquivo mas não estão na lista
+    // fixa são incluídos no final, para nada ficar de fora.
+
+    motivosAgregados.forEach(m=>{
+
+        if(!usados.has(m.codigo)){
+
+            linhas.push({
+                label: m.codigo.replace(/_/g," "),
+                qtd: m.total
+            });
+
+        }
+
+    });
+
+    return linhas;
+
+}
+
+async function baixarRelatorioWhatsapp(){
+
+    if(!dadosRejeitos.length){
+
+        alert(
+            "Processe os arquivos primeiro."
+        );
+
+        return;
+
+    }
+
+    const cd =
+    document.getElementById("configCD").value || "CD";
+
+    const dataRef =
+    document.getElementById("configData").value || "-";
+
+    const meta =
+    parseFloat(
+        document.getElementById("configMeta").value
+    ) || 0;
+
+    const totalRejeitos =
+    dadosRejeitos.length;
+
+    const totalLido =
+    dadosEstacoes.reduce(
+        (s,d) => s + d.leiturasOk + d.semLeitura,
+        0
+    );
+
+    const pctRejeitos =
+    totalLido
+    ? (totalRejeitos / totalLido * 100)
+    : 0;
+
+    const delta =
+    pctRejeitos - meta;
+
+    const motivos =
+    agregarMotivos(dadosRejeitos);
+
+    const linhasMotivos =
+    montarLinhasMotivosCanonicos(motivos, totalRejeitos);
+
+    const fmt = n => n.toLocaleString("pt-BR");
+
+    const fmtPct = n => n.toLocaleString(
+        "pt-BR",
+        {minimumFractionDigits:2, maximumFractionDigits:2}
+    ) + "%";
+
+    const deltaTexto =
+    (delta >= 0 ? "+" : "") + fmtPct(delta);
+
+    const AZUL = "#1F3864";
+    const AZUL_CLARO = "#2E5395";
+    const LARANJA = "#C0621A";
+    const VERDE_BG = "#E5F5E9";
+    const VERDE_TXT = "#1E7B34";
+    const ROSA_BG = "#F9D6D5";
+    const VERMELHO_TXT = "#C0392B";
+    const AMARELO_BG = "#FFF6C6";
+    const BORDA = "#B9C4D6";
+
+    let linhasHtml = "";
+
+    linhasMotivos.forEach((item,indice)=>{
+
+        const pct =
+        totalLido
+        ? (item.qtd / totalLido * 100)
+        : 0;
+
+        linhasHtml += `
+        <tr>
+            <td style="
+                padding:9px 14px;
+                border:1px solid ${BORDA};
+                text-align:left;
+                font-weight:700;
+                color:#1A1D21;
+            ">${item.label}</td>
+            <td style="
+                padding:9px 14px;
+                border:1px solid ${BORDA};
+                text-align:center;
+                color:#1A1D21;
+            ">${fmt(item.qtd)}</td>
+            <td style="
+                padding:9px 14px;
+                border:1px solid ${BORDA};
+                text-align:center;
+                color:#1A1D21;
+            ">${fmtPct(pct)}</td>
+            <td style="
+                padding:9px 14px;
+                border:1px solid ${BORDA};
+                text-align:center;
+                color:#8B97A3;
+            ">—</td>
+        </tr>
+        `;
+
+    });
+
+    const card = document.createElement("div");
+
+    card.style.width = "600px";
+    card.style.background = "#FFFFFF";
+    card.style.fontFamily = "'Segoe UI',Arial,sans-serif";
+    card.style.overflow = "hidden";
+    card.style.border = `1px solid ${BORDA}`;
+
+    card.innerHTML = `
+
+        <div style="
+            background:${AZUL};
+            padding:18px;
+            text-align:center;
+        ">
+            <span style="
+                color:#FFFFFF;
+                font-size:20px;
+                font-weight:700;
+                letter-spacing:.03em;
+                text-transform:uppercase;
+            ">REJEITOS CD · ${cd.toUpperCase()}</span>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;">
+
+            <tr>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:12px;
+                    width:25%;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">Data de Referência</td>
+                <td style="
+                    background:#fff;
+                    color:${LARANJA};
+                    padding:12px;
+                    width:25%;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">${dataRef}</td>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:12px;
+                    width:25%;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">META</td>
+                <td style="
+                    background:${VERDE_BG};
+                    color:${VERDE_TXT};
+                    padding:12px;
+                    width:25%;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">${fmtPct(meta)}</td>
+            </tr>
+
+            <tr>
+                <td style="
+                    background:${AZUL_CLARO};
+                    color:#fff;
+                    padding:14px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">TOTAL LIDO</td>
+                <td style="
+                    background:#fff;
+                    color:#1A1D21;
+                    padding:14px;
+                    font-weight:700;
+                    font-size:17px;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">${fmt(totalLido)}</td>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:14px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">REJEITOS</td>
+                <td style="
+                    background:${ROSA_BG};
+                    color:${VERMELHO_TXT};
+                    padding:14px;
+                    font-weight:700;
+                    font-size:17px;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">${fmt(totalRejeitos)}</td>
+            </tr>
+
+            <tr>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:11px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">MOTIVO DE REJEIÇÃO</td>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:11px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">QTD</td>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:11px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">% DO TOTAL</td>
+                <td style="
+                    background:${AZUL};
+                    color:#fff;
+                    padding:11px;
+                    font-weight:700;
+                    text-align:center;
+                    border:1px solid ${BORDA};
+                ">DELTA p/ META</td>
+            </tr>
+
+            <tr>
+                <td style="
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:left;
+                    font-weight:700;
+                    color:#1A1D21;
+                ">TOTAL LIDO</td>
+                <td style="
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    font-weight:700;
+                    color:#1A1D21;
+                ">${fmt(totalLido)}</td>
+                <td style="
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    color:#8B97A3;
+                ">—</td>
+                <td style="
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    color:#8B97A3;
+                ">—</td>
+            </tr>
+
+            <tr>
+                <td style="
+                    background:${AMARELO_BG};
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:left;
+                    font-weight:700;
+                    color:#1A1D21;
+                ">TOTAL REJEITOS</td>
+                <td style="
+                    background:${AMARELO_BG};
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    font-weight:700;
+                    color:#1A1D21;
+                ">${fmt(totalRejeitos)}</td>
+                <td style="
+                    background:${AMARELO_BG};
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    font-weight:700;
+                    color:#1A1D21;
+                ">${fmtPct(pctRejeitos)}</td>
+                <td style="
+                    background:${AMARELO_BG};
+                    padding:10px 14px;
+                    border:1px solid ${BORDA};
+                    text-align:center;
+                    font-weight:700;
+                    color:${VERMELHO_TXT};
+                ">${deltaTexto}</td>
+            </tr>
+
+            ${linhasHtml}
+
+        </table>
+
+    `;
+
+    card.style.position = "fixed";
+    card.style.left = "-9999px";
+    card.style.top = "0";
+
+    document.body.appendChild(card);
+
+    try{
+
+        const canvas = await html2canvas(
+            card,
+            {
+                scale: 2,
+                backgroundColor: "#FFFFFF"
+            }
+        );
+
+        const link =
+        document.createElement("a");
+
+        link.download =
+        `rejeitos-${cd.replace(/\s+/g,"-").toLowerCase()}-${dataRef.replace(/\//g,"-")}.png`;
+
+        link.href =
+        canvas.toDataURL("image/png");
+
+        link.click();
+
+    }catch(erro){
+
+        console.error(erro);
+
+        alert(
+            "Não foi possível gerar a imagem do relatório."
+        );
+
+    }finally{
+
+        card.remove();
+
+    }
 
 }
