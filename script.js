@@ -794,15 +794,34 @@ async function baixarRelatorioWhatsapp(){
     const deltaTexto =
     (delta >= 0 ? "+" : "") + fmtPct(delta);
 
-    const AZUL = "#1F3864";
-    const AZUL_CLARO = "#2E5395";
-    const LARANJA = "#C0621A";
-    const VERDE_BG = "#E5F5E9";
-    const VERDE_TXT = "#1E7B34";
-    const ROSA_BG = "#F9D6D5";
-    const VERMELHO_TXT = "#C0392B";
-    const AMARELO_BG = "#FFF6C6";
-    const BORDA = "#B9C4D6";
+    const dentroMeta = pctRejeitos <= meta;
+
+    // Paleta alinhada ao design system do site
+    // (graphite + amber/green/red), sobre fundo claro
+    // para melhor leitura e compartilhamento no WhatsApp.
+    const GRAFITE = "#1D2329";
+    const GRAFITE_2 = "#262E36";
+    const AMBAR = "#F2A93B";
+    const VERDE = "#3DCB82";
+    const VERDE_BG = "#E4F8ED";
+    const VERDE_TXT = "#1E7B4D";
+    const VERMELHO = "#E8564F";
+    const VERMELHO_BG = "#FCE9E8";
+    const VERMELHO_TXT = "#C13B34";
+    const TEXTO = "#1A1D21";
+    const TEXTO_MUTED = "#8B97A3";
+    const BORDA = "#E4E8ED";
+    const LINHA_PAR = "#F7F9FB";
+
+    const corStatus = dentroMeta ? VERDE : VERMELHO;
+    const corStatusBg = dentroMeta ? VERDE_BG : VERMELHO_BG;
+    const corStatusTxt = dentroMeta ? VERDE_TXT : VERMELHO_TXT;
+    const statusLabel = dentroMeta ? "DENTRO DA META" : "ACIMA DA META";
+
+    const maiorQtdMotivo = Math.max(
+        1,
+        ...linhasMotivos.map(m => m.qtd)
+    );
 
     let linhasHtml = "";
 
@@ -813,33 +832,64 @@ async function baixarRelatorioWhatsapp(){
         ? (item.qtd / totalLido * 100)
         : 0;
 
+        const larguraBarra =
+        Math.max(3, (item.qtd / maiorQtdMotivo) * 100);
+
+        const bgLinha = indice % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
+
         linhasHtml += `
-        <tr>
+        <tr style="background:${bgLinha};">
             <td style="
-                padding:9px 14px;
-                border:1px solid ${BORDA};
+                padding:10px 16px;
                 text-align:left;
-                font-weight:700;
-                color:#1A1D21;
+                font-weight:600;
+                font-size:13px;
+                color:${TEXTO};
+                border-bottom:1px solid ${BORDA};
             ">${item.label}</td>
             <td style="
-                padding:9px 14px;
-                border:1px solid ${BORDA};
+                padding:10px 16px;
                 text-align:center;
-                color:#1A1D21;
+                font-weight:700;
+                font-size:13px;
+                color:${TEXTO};
+                border-bottom:1px solid ${BORDA};
             ">${fmt(item.qtd)}</td>
             <td style="
-                padding:9px 14px;
-                border:1px solid ${BORDA};
-                text-align:center;
-                color:#1A1D21;
-            ">${fmtPct(pct)}</td>
-            <td style="
-                padding:9px 14px;
-                border:1px solid ${BORDA};
-                text-align:center;
-                color:#8B97A3;
-            ">—</td>
+                padding:10px 16px;
+                text-align:right;
+                border-bottom:1px solid ${BORDA};
+                width:38%;
+            ">
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:flex-end;
+                    gap:8px;
+                ">
+                    <div style="
+                        flex:1;
+                        height:7px;
+                        background:${BORDA};
+                        border-radius:4px;
+                        overflow:hidden;
+                    ">
+                        <div style="
+                            width:${larguraBarra}%;
+                            height:100%;
+                            background:${AMBAR};
+                            border-radius:4px;
+                        "></div>
+                    </div>
+                    <span style="
+                        font-size:12px;
+                        font-weight:700;
+                        color:${TEXTO_MUTED};
+                        min-width:44px;
+                        text-align:right;
+                    ">${fmtPct(pct)}</span>
+                </div>
+            </td>
         </tr>
         `;
 
@@ -847,208 +897,267 @@ async function baixarRelatorioWhatsapp(){
 
     const card = document.createElement("div");
 
-    card.style.width = "600px";
+    card.style.width = "640px";
     card.style.background = "#FFFFFF";
-    card.style.fontFamily = "'Segoe UI',Arial,sans-serif";
+    card.style.fontFamily = "'Inter','Segoe UI',Arial,sans-serif";
     card.style.overflow = "hidden";
+    card.style.borderRadius = "16px";
     card.style.border = `1px solid ${BORDA}`;
 
     card.innerHTML = `
 
+        <!-- CABEÇALHO -->
         <div style="
-            background:${AZUL};
-            padding:18px;
-            text-align:center;
+            background:linear-gradient(135deg, ${GRAFITE} 0%, ${GRAFITE_2} 100%);
+            padding:26px 28px 22px;
         ">
-            <span style="
-                color:#FFFFFF;
-                font-size:20px;
-                font-weight:700;
-                letter-spacing:.03em;
-                text-transform:uppercase;
-            ">REJEITOS CD · ${cd.toUpperCase()}</span>
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+            ">
+                <div>
+                    <div style="
+                        font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                        color:#FFFFFF;
+                        font-size:22px;
+                        font-weight:600;
+                        letter-spacing:.04em;
+                        text-transform:uppercase;
+                        line-height:1.2;
+                    ">🗑️ Relatório de Rejeito</div>
+                    <div style="
+                        color:${AMBAR};
+                        font-size:13px;
+                        font-weight:600;
+                        letter-spacing:.05em;
+                        text-transform:uppercase;
+                        margin-top:4px;
+                    ">${cd.toUpperCase()}</div>
+                </div>
+                <div style="
+                    background:rgba(255,255,255,.08);
+                    border:1px solid rgba(255,255,255,.14);
+                    border-radius:10px;
+                    padding:8px 14px;
+                    text-align:center;
+                ">
+                    <div style="
+                        color:${TEXTO_MUTED};
+                        font-size:10px;
+                        font-weight:600;
+                        letter-spacing:.05em;
+                        text-transform:uppercase;
+                    ">Referência</div>
+                    <div style="
+                        color:#FFFFFF;
+                        font-size:15px;
+                        font-weight:700;
+                        margin-top:2px;
+                    ">${dataRef}</div>
+                </div>
+            </div>
         </div>
 
-        <table style="width:100%;border-collapse:collapse;">
+        <!-- KPIs -->
+        <div style="
+            display:flex;
+            gap:10px;
+            padding:20px 20px 4px;
+        ">
 
-            <tr>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:12px;
-                    width:25%;
+            <div style="
+                flex:1;
+                background:${LINHA_PAR};
+                border:1px solid ${BORDA};
+                border-radius:12px;
+                padding:14px 12px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:10px;
                     font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">Data de Referência</td>
-                <td style="
-                    background:#fff;
-                    color:${LARANJA};
-                    padding:12px;
-                    width:25%;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">${dataRef}</td>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:12px;
-                    width:25%;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">META</td>
-                <td style="
-                    background:${VERDE_BG};
-                    color:${VERDE_TXT};
-                    padding:12px;
-                    width:25%;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">${fmtPct(meta)}</td>
-            </tr>
+                    letter-spacing:.05em;
+                    text-transform:uppercase;
+                    color:${TEXTO_MUTED};
+                ">Total Lido</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:24px;
+                    font-weight:600;
+                    color:${TEXTO};
+                    margin-top:4px;
+                ">${fmt(totalLido)}</div>
+            </div>
 
-            <tr>
-                <td style="
-                    background:${AZUL_CLARO};
-                    color:#fff;
-                    padding:14px;
+            <div style="
+                flex:1;
+                background:${VERMELHO_BG};
+                border:1px solid ${VERMELHO_BG};
+                border-radius:12px;
+                padding:14px 12px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:10px;
                     font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">TOTAL LIDO</td>
-                <td style="
-                    background:#fff;
-                    color:#1A1D21;
-                    padding:14px;
-                    font-weight:700;
-                    font-size:17px;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">${fmt(totalLido)}</td>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:14px;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">REJEITOS</td>
-                <td style="
-                    background:${ROSA_BG};
+                    letter-spacing:.05em;
+                    text-transform:uppercase;
                     color:${VERMELHO_TXT};
-                    padding:14px;
-                    font-weight:700;
-                    font-size:17px;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">${fmt(totalRejeitos)}</td>
-            </tr>
-
-            <tr>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:11px;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">MOTIVO DE REJEIÇÃO</td>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:11px;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">QTD</td>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:11px;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">% DO TOTAL</td>
-                <td style="
-                    background:${AZUL};
-                    color:#fff;
-                    padding:11px;
-                    font-weight:700;
-                    text-align:center;
-                    border:1px solid ${BORDA};
-                ">DELTA p/ META</td>
-            </tr>
-
-            <tr>
-                <td style="
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:left;
-                    font-weight:700;
-                    color:#1A1D21;
-                ">TOTAL LIDO</td>
-                <td style="
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    font-weight:700;
-                    color:#1A1D21;
-                ">${fmt(totalLido)}</td>
-                <td style="
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    color:#8B97A3;
-                ">—</td>
-                <td style="
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    color:#8B97A3;
-                ">—</td>
-            </tr>
-
-            <tr>
-                <td style="
-                    background:${AMARELO_BG};
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:left;
-                    font-weight:700;
-                    color:#1A1D21;
-                ">TOTAL REJEITOS</td>
-                <td style="
-                    background:${AMARELO_BG};
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    font-weight:700;
-                    color:#1A1D21;
-                ">${fmt(totalRejeitos)}</td>
-                <td style="
-                    background:${AMARELO_BG};
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    font-weight:700;
-                    color:#1A1D21;
-                ">${fmtPct(pctRejeitos)}</td>
-                <td style="
-                    background:${AMARELO_BG};
-                    padding:10px 14px;
-                    border:1px solid ${BORDA};
-                    text-align:center;
-                    font-weight:700;
+                ">Rejeitos</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:24px;
+                    font-weight:600;
                     color:${VERMELHO_TXT};
-                ">${deltaTexto}</td>
-            </tr>
+                    margin-top:4px;
+                ">${fmt(totalRejeitos)}</div>
+            </div>
 
-            ${linhasHtml}
+            <div style="
+                flex:1;
+                background:${corStatusBg};
+                border:1px solid ${corStatusBg};
+                border-radius:12px;
+                padding:14px 12px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:10px;
+                    font-weight:700;
+                    letter-spacing:.05em;
+                    text-transform:uppercase;
+                    color:${corStatusTxt};
+                ">% Rejeito</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:24px;
+                    font-weight:600;
+                    color:${corStatusTxt};
+                    margin-top:4px;
+                ">${fmtPct(pctRejeitos)}</div>
+            </div>
 
-        </table>
+        </div>
+
+        <!-- BARRA DE STATUS x META -->
+        <div style="
+            margin:16px 20px 4px;
+            background:${corStatusBg};
+            border-radius:10px;
+            padding:10px 16px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+        ">
+            <div style="
+                display:flex;
+                align-items:center;
+                gap:8px;
+            ">
+                <span style="
+                    width:8px;
+                    height:8px;
+                    border-radius:50%;
+                    background:${corStatus};
+                    display:inline-block;
+                "></span>
+                <span style="
+                    font-size:12px;
+                    font-weight:700;
+                    letter-spacing:.03em;
+                    color:${corStatusTxt};
+                ">${statusLabel}</span>
+            </div>
+            <div style="
+                font-size:12px;
+                color:${TEXTO_MUTED};
+                font-weight:600;
+            ">Meta: <span style="color:${TEXTO};">${fmtPct(meta)}</span> · Delta: <span style="color:${corStatusTxt};">${deltaTexto}</span></div>
+        </div>
+
+        <!-- TABELA DE MOTIVOS -->
+        <div style="margin:18px 20px 24px;">
+
+            <div style="
+                font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                font-size:13px;
+                font-weight:600;
+                letter-spacing:.04em;
+                text-transform:uppercase;
+                color:${TEXTO};
+                margin-bottom:8px;
+                padding-left:2px;
+            ">Motivos de Rejeição</div>
+
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                border:1px solid ${BORDA};
+                border-radius:10px;
+                overflow:hidden;
+            ">
+
+                <thead>
+                    <tr style="background:${GRAFITE};">
+                        <th style="
+                            padding:10px 16px;
+                            text-align:left;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Motivo</th>
+                        <th style="
+                            padding:10px 16px;
+                            text-align:center;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Qtd</th>
+                        <th style="
+                            padding:10px 16px;
+                            text-align:right;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">% do Total</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${linhasHtml}
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <!-- RODAPÉ -->
+        <div style="
+            background:${GRAFITE};
+            padding:10px 20px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+        ">
+            <span style="
+                color:${TEXTO_MUTED};
+                font-size:10px;
+                font-weight:500;
+            ">Gerado em ${new Date().toLocaleString("pt-BR")}</span>
+            <span style="
+                color:${TEXTO_MUTED};
+                font-size:10px;
+                font-weight:700;
+                letter-spacing:.05em;
+            ">CD-107 · PCP</span>
+        </div>
 
     `;
 
