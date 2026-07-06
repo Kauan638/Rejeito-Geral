@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        Relatório de Rejeito Geral
+    </title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>
+            🗑️ Relatório de Rejeito Geral
+        </h1>
+
+        <p class="subtitulo">
+            Consultar Rejeitos · Relatório de Estações de Leitura
+        </p>
+
+        <!-- ===================================== -->
+        <!-- UPLOADS -->
+        <!-- ===================================== -->
+
+        <div class="card">
+
+            <h2>
+                Arquivos
+            </h2>
+
+            <div class="upload-area">
+
+                <div class="upload-box">
+
+                    <label>
+                        📄 Consultar Rejeitos (.csv)
+                    </label>
+
+                    <label
+                        class="upload-btn"
+                        for="arquivoRejeitos">
+
+                        Selecionar Arquivo
+
+                    </label>
+
+                    <input
+                        type="file"
+                        id="arquivoRejeitos"
+                        accept=".csv"
+                        onchange="nomeArquivoSelecionado('arquivoRejeitos','nomeRejeitos')">
+
+                    <div
+                        class="upload-nome"
+                        id="nomeRejeitos">
+
+                        Nenhum arquivo selecionado
+
+                    </div>
+
+                </div>
+
+                <div class="upload-box">
+
+                    <label>
+                        📶 Relatório Estações de Leitura (.csv)
+                    </label>
+
+                    <label
+                        class="upload-btn"
+                        for="arquivoEstacoes">
+
+                        Selecionar Arquivo
+
+                    </label>
+
+                    <input
+                        type="file"
+                        id="arquivoEstacoes"
+                        accept=".csv"
+                        onchange="nomeArquivoSelecionado('arquivoEstacoes','nomeEstacoes')">
+
+                    <div
+                        class="upload-nome"
+                        id="nomeEstacoes">
+
+                        Nenhum arquivo selecionado
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <br>
+
+            <div class="acoes">
+
+                <button
+                    class="btn-processar"
+                    onclick="processarTudo()">
+
+                    🚀 Processar e Analisar
+
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- ===================================== -->
+        <!-- RESULTADO -->
+        <!-- ===================================== -->
+
+        <div
+            class="oculto"
+            id="resultado">
+
+            <!-- KPIs -->
+
+            <div class="kpis">
+
+                <div class="kpi-card">
+                    <h3>Total de Rejeitos</h3>
+                    <span id="kpiTotalRejeitos">0</span>
+                </div>
+
+                <div class="kpi-card">
+                    <h3>Motivo Principal</h3>
+                    <span id="kpiMotivoPrincipal" style="font-size:1.3rem;">-</span>
+                </div>
+
+                <div class="kpi-card">
+                    <h3>Taxa de Leitura OK</h3>
+                    <span id="kpiTaxaLeitura">0%</span>
+                </div>
+
+                <div class="kpi-card">
+                    <h3>Sem Leitura</h3>
+                    <span id="kpiSemLeitura">0</span>
+                </div>
+
+            </div>
+
+            <!-- ALERTA DE CONSISTÊNCIA -->
+
+            <div id="alertaConsistencia"></div>
+
+            <!-- GRÁFICOS -->
+
+            <div class="grid-2col">
+
+                <div class="chart-box">
+                    <h3>Rejeitos por Motivo</h3>
+                    <canvas id="graficoMotivo"></canvas>
+                </div>
+
+                <div class="chart-box">
+                    <h3>Rejeitos por Hora do Dia</h3>
+                    <canvas id="graficoHora"></canvas>
+                </div>
+
+            </div>
+
+            <!-- DETALHAMENTO POR MOTIVO -->
+
+            <div class="card">
+
+                <h2>
+                    Detalhamento por Motivo de Rejeição
+                </h2>
+
+                <div class="tabela-container">
+
+                    <table class="tabela">
+
+                        <thead>
+                            <tr>
+                                <th>Motivo</th>
+                                <th>Quantidade</th>
+                                <th>% do Total</th>
+                                <th>ACKN Sim</th>
+                                <th>ACKN Não</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="corpoMotivos">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+            <!-- STATUS DO VOLUME -->
+
+            <div class="card">
+
+                <h2>
+                    Rejeitos por Status do Volume
+                </h2>
+
+                <div class="tabela-container">
+
+                    <table class="tabela">
+
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Quantidade</th>
+                                <th>% do Total</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="corpoStatus">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+            <!-- ESTAÇÕES DE LEITURA -->
+
+            <div class="card">
+
+                <h2>
+                    Estações de Leitura por Dia
+                </h2>
+
+                <div class="tabela-container">
+
+                    <table class="tabela">
+
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Leituras OK</th>
+                                <th>Sem Leitura</th>
+                                <th>Total</th>
+                                <th>Taxa OK</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="corpoEstacoes">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
