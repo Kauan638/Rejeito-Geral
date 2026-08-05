@@ -1330,7 +1330,20 @@ function labelMotivo(codigo){
 
 }
 
-function montarLinhasPorHora(dadosRejeitos){
+function corMotivo(codigo, mapaCores){
+
+    if(!(codigo in mapaCores)){
+
+        mapaCores[codigo] =
+        PALETA_MOTIVOS[Object.keys(mapaCores).length % PALETA_MOTIVOS.length];
+
+    }
+
+    return mapaCores[codigo];
+
+}
+
+function montarGruposPorHora(dadosRejeitos){
 
     const porHora = {};
 
@@ -1349,18 +1362,19 @@ function montarLinhasPorHora(dadosRejeitos){
 
     });
 
-    function montarMotivosTexto(motivosMap){
+    function montarMotivosLista(motivosMap){
 
         return Object.entries(motivosMap)
         .sort((a,b) => b[1] - a[1])
-        .map(([codigo,qtd]) =>
-            labelMotivo(codigo) + (qtd > 1 ? ` (${qtd})` : "")
-        )
-        .join(", ");
+        .map(([codigo,qtd]) => ({
+            codigo,
+            label: labelMotivo(codigo),
+            qtd
+        }));
 
     }
 
-    const linhas = [];
+    const grupos = [];
 
     for(let hora = 0; hora < 24; hora++){
 
@@ -1368,14 +1382,12 @@ function montarLinhasPorHora(dadosRejeitos){
 
         if(motivosMap){
 
-            const qtd =
-            Object.values(motivosMap)
-            .reduce((s,v) => s + v, 0);
+            const motivos = montarMotivosLista(motivosMap);
 
-            linhas.push({
+            grupos.push({
                 label: hora.toString().padStart(2,"0") + "h",
-                qtd,
-                motivos: montarMotivosTexto(motivosMap)
+                qtd: motivos.reduce((s,m) => s + m.qtd, 0),
+                motivos
             });
 
         }
@@ -1384,19 +1396,17 @@ function montarLinhasPorHora(dadosRejeitos){
 
     if(porHora[null]){
 
-        const qtd =
-        Object.values(porHora[null])
-        .reduce((s,v) => s + v, 0);
+        const motivos = montarMotivosLista(porHora[null]);
 
-        linhas.push({
+        grupos.push({
             label: "SEM HORÁRIO",
-            qtd,
-            motivos: montarMotivosTexto(porHora[null])
+            qtd: motivos.reduce((s,m) => s + m.qtd, 0),
+            motivos
         });
 
     }
 
-    return linhas;
+    return grupos;
 
 }
 
@@ -1421,11 +1431,11 @@ async function baixarRelatorioWhatsappHora(){
     const totalRejeitos =
     dadosRejeitos.length;
 
-    const linhasHora =
-    montarLinhasPorHora(dadosRejeitos);
+    const gruposHora =
+    montarGruposPorHora(dadosRejeitos);
 
     // Ordem cronológica (00h -> 23h), "SEM HORÁRIO" sempre ao final.
-    linhasHora.sort((a,b)=>{
+    gruposHora.sort((a,b)=>{
 
         if(a.label === "SEM HORÁRIO") return 1;
         if(b.label === "SEM HORÁRIO") return -1;
@@ -1435,17 +1445,17 @@ async function baixarRelatorioWhatsappHora(){
     });
 
     // Horário de pico (maior quantidade; ignora "SEM HORÁRIO").
-    const linhasComHora =
-    linhasHora.filter(l => l.label !== "SEM HORÁRIO");
+    const gruposComHora =
+    gruposHora.filter(g => g.label !== "SEM HORÁRIO");
 
     const picoHora =
-    linhasComHora.reduce(
+    gruposComHora.reduce(
         (max,item) => (!max || item.qtd > max.qtd) ? item : max,
         null
     );
 
     const horasAtivas =
-    linhasComHora.length;
+    gruposComHora.length;
 
     const mediaPorHoraAtiva =
     horasAtivas
@@ -1473,65 +1483,100 @@ async function baixarRelatorioWhatsappHora(){
     const BORDA = "#E4E8ED";
     const LINHA_PAR = "#F7F9FB";
 
-    const maiorQtdHora = Math.max(
-        1,
-        ...linhasHora.map(l => l.qtd)
-    );
+    const mapaCoresMotivo = {};
 
     let linhasHtml = "";
 
-    linhasHora.forEach((item,indice)=>{
-
-        const pct =
-        totalRejeitos
-        ? (item.qtd / totalRejeitos * 100)
-        : 0;
-
-        const bgLinha = indice % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
+    gruposHora.forEach((grupo,indiceGrupo)=>{
 
         const ehPico =
-        picoHora && item.label === picoHora.label;
+        picoHora && grupo.label === picoHora.label;
 
-        linhasHtml += `
-        <tr style="background:${bgLinha};">
-            <td style="
-                padding:10px 14px;
-                text-align:left;
-                font-weight:700;
-                font-size:13px;
-                color:${TEXTO};
-                border-bottom:1px solid ${BORDA};
-                white-space:nowrap;
-            ">${item.label}${ehPico ? " 🔺" : ""}</td>
-            <td style="
-                padding:10px 14px;
-                text-align:left;
-                font-weight:500;
-                font-size:11.5px;
-                line-height:1.35;
-                color:${TEXTO_MUTED};
-                border-bottom:1px solid ${BORDA};
-            ">${item.motivos || "-"}</td>
-            <td style="
-                padding:10px 14px;
-                text-align:center;
-                font-weight:700;
-                font-size:13px;
-                color:${TEXTO};
-                border-bottom:1px solid ${BORDA};
-                white-space:nowrap;
-            ">${fmt(item.qtd)}</td>
-            <td style="
-                padding:10px 14px;
-                text-align:right;
-                font-weight:700;
-                font-size:12px;
-                color:${ehPico ? "#C13B34" : TEXTO_MUTED};
-                border-bottom:1px solid ${BORDA};
-                white-space:nowrap;
-            ">${fmtPct(pct)}</td>
-        </tr>
-        `;
+        const bgGrupo =
+        indiceGrupo % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
+
+        const pctGrupo =
+        totalRejeitos
+        ? (grupo.qtd / totalRejeitos * 100)
+        : 0;
+
+        const bordaSuperior =
+        indiceGrupo > 0 ? `border-top:2px solid ${BORDA};` : "";
+
+        grupo.motivos.forEach((mot,indiceMotivo)=>{
+
+            const cor =
+            corMotivo(mot.codigo, mapaCoresMotivo);
+
+            const pctMotivo =
+            totalRejeitos
+            ? (mot.qtd / totalRejeitos * 100)
+            : 0;
+
+            linhasHtml += `
+            <tr style="background:${bgGrupo};">
+                ${indiceMotivo === 0 ? `
+                <td rowspan="${grupo.motivos.length}" style="
+                    padding:12px 14px;
+                    text-align:left;
+                    vertical-align:top;
+                    font-weight:700;
+                    font-size:14px;
+                    color:${ehPico ? "#C13B34" : TEXTO};
+                    border-bottom:1px solid ${BORDA};
+                    ${bordaSuperior}
+                    white-space:nowrap;
+                ">
+                    <div>${grupo.label}${ehPico ? " 🔺" : ""}</div>
+                    <div style="
+                        margin-top:3px;
+                        font-size:10px;
+                        font-weight:700;
+                        color:${TEXTO_MUTED};
+                    ">${fmt(grupo.qtd)} · ${fmtPct(pctGrupo)}</div>
+                </td>
+                ` : ""}
+                <td style="
+                    padding:9px 14px;
+                    text-align:left;
+                    font-weight:500;
+                    font-size:12.5px;
+                    color:${TEXTO};
+                    border-bottom:1px solid ${BORDA};
+                    ${indiceMotivo === 0 ? bordaSuperior : ""}
+                ">
+                    <span style="
+                        display:inline-block;
+                        width:8px;
+                        height:8px;
+                        border-radius:50%;
+                        background:${cor};
+                        margin-right:8px;
+                    "></span>${mot.label}
+                </td>
+                <td style="
+                    padding:9px 14px;
+                    text-align:center;
+                    font-weight:700;
+                    font-size:12.5px;
+                    color:${TEXTO};
+                    border-bottom:1px solid ${BORDA};
+                    ${indiceMotivo === 0 ? bordaSuperior : ""}
+                ">${fmt(mot.qtd)}</td>
+                <td style="
+                    padding:9px 14px;
+                    text-align:right;
+                    font-weight:600;
+                    font-size:11.5px;
+                    color:${TEXTO_MUTED};
+                    border-bottom:1px solid ${BORDA};
+                    ${indiceMotivo === 0 ? bordaSuperior : ""}
+                    white-space:nowrap;
+                ">${fmtPct(pctMotivo)}</td>
+            </tr>
+            `;
+
+        });
 
     });
 
