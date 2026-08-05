@@ -1343,24 +1343,65 @@ function corMotivo(codigo, mapaCores){
 
 }
 
-function montarGruposPorHora(dadosRejeitos){
+function formatarDataDiaMes(data){
 
-    const porHora = {};
+    if(!data){
 
-    dadosRejeitos.forEach(item=>{
+        return "-";
 
-        const chave = item.hora;
+    }
 
-        if(!porHora[chave]){
+    // Formato "2026-07-01" -> "01/07"
+    if(/^\d{4}-\d{2}-\d{2}/.test(data)){
 
-            porHora[chave] = {};
+        const [ano, mes, dia] = data.split("-");
 
-        }
+        return `${dia}/${mes}`;
 
-        porHora[chave][item.codigo] =
-        (porHora[chave][item.codigo] || 0) + 1;
+    }
 
-    });
+    // Formato "01/07/2026" -> "01/07"
+    if(/^\d{2}\/\d{2}\/\d{4}/.test(data)){
+
+        const [dia, mes] = data.split("/");
+
+        return `${dia}/${mes}`;
+
+    }
+
+    return data;
+
+}
+
+function chaveOrdenavelData(data){
+
+    if(!data){
+
+        return "";
+
+    }
+
+    // "2026-07-01" já é ordenável.
+    if(/^\d{4}-\d{2}-\d{2}/.test(data)){
+
+        return data;
+
+    }
+
+    // "01/07/2026" -> "2026-07-01"
+    if(/^\d{2}\/\d{2}\/\d{4}/.test(data)){
+
+        const [dia, mes, ano] = data.split("/");
+
+        return `${ano}-${mes}-${dia}`;
+
+    }
+
+    return data;
+
+}
+
+function montarGruposPorDataHora(dadosRejeitos){
 
     function montarMotivosLista(motivosMap){
 
@@ -1374,39 +1415,82 @@ function montarGruposPorHora(dadosRejeitos){
 
     }
 
-    const grupos = [];
+    // Agrupa: data -> hora ("SEM HORÁRIO" ao final) -> codigo -> qtd
+    const porData = {};
 
-    for(let hora = 0; hora < 24; hora++){
+    dadosRejeitos.forEach(item=>{
 
-        const motivosMap = porHora[hora];
+        const chaveData = item.data || "-";
 
-        if(motivosMap){
+        const chaveHora =
+        item.hora !== null
+        ? item.hora
+        : "SEM HORÁRIO";
 
-            const motivos = montarMotivosLista(motivosMap);
+        if(!porData[chaveData]){
 
-            grupos.push({
-                label: hora.toString().padStart(2,"0") + "h",
-                qtd: motivos.reduce((s,m) => s + m.qtd, 0),
-                motivos
-            });
+            porData[chaveData] = {};
 
         }
 
-    }
+        if(!porData[chaveData][chaveHora]){
 
-    if(porHora[null]){
+            porData[chaveData][chaveHora] = {};
 
-        const motivos = montarMotivosLista(porHora[null]);
+        }
 
-        grupos.push({
-            label: "SEM HORÁRIO",
-            qtd: motivos.reduce((s,m) => s + m.qtd, 0),
-            motivos
+        porData[chaveData][chaveHora][item.codigo] =
+        (porData[chaveData][chaveHora][item.codigo] || 0) + 1;
+
+    });
+
+    const datasOrdenadas =
+    Object.keys(porData)
+    .sort((a,b) => chaveOrdenavelData(a).localeCompare(chaveOrdenavelData(b)));
+
+    const gruposData = [];
+
+    datasOrdenadas.forEach(dataBruta=>{
+
+        const porHora = porData[dataBruta];
+
+        const chavesHora =
+        Object.keys(porHora)
+        .sort((a,b)=>{
+
+            if(a === "SEM HORÁRIO") return 1;
+            if(b === "SEM HORÁRIO") return -1;
+
+            return Number(a) - Number(b);
+
         });
 
-    }
+        const horas =
+        chavesHora.map(chaveHora=>{
 
-    return grupos;
+            const motivos =
+            montarMotivosLista(porHora[chaveHora]);
+
+            return {
+                label:
+                chaveHora === "SEM HORÁRIO"
+                ? "SEM HORÁRIO"
+                : chaveHora.toString().padStart(2,"0") + "h",
+                qtd: motivos.reduce((s,m) => s + m.qtd, 0),
+                motivos
+            };
+
+        });
+
+        gruposData.push({
+            dataLabel: formatarDataDiaMes(dataBruta),
+            qtd: horas.reduce((s,h) => s + h.qtd, 0),
+            horas
+        });
+
+    });
+
+    return gruposData;
 
 }
 
@@ -1431,31 +1515,42 @@ async function baixarRelatorioWhatsappHora(){
     const totalRejeitos =
     dadosRejeitos.length;
 
-    const gruposHora =
-    montarGruposPorHora(dadosRejeitos);
+    const gruposData =
+    montarGruposPorDataHora(dadosRejeitos);
 
-    // Ordem cronológica (00h -> 23h), "SEM HORÁRIO" sempre ao final.
-    gruposHora.sort((a,b)=>{
+    // Achata em linhas (data + hora) preservando a ordem cronológica,
+    // guardando quantas linhas cada data ocupa (para o rowspan).
+    const linhasAchatadas = [];
 
-        if(a.label === "SEM HORÁRIO") return 1;
-        if(b.label === "SEM HORÁRIO") return -1;
+    gruposData.forEach(grupoData=>{
 
-        return a.label.localeCompare(b.label);
+        grupoData.horas.forEach((horaItem,indiceHora)=>{
+
+            linhasAchatadas.push({
+                dataLabel: grupoData.dataLabel,
+                primeiraLinhaData: indiceHora === 0,
+                linhasData: grupoData.horas.length,
+                horaLabel: horaItem.label,
+                qtd: horaItem.qtd,
+                motivos: horaItem.motivos
+            });
+
+        });
 
     });
 
     // Horário de pico (maior quantidade; ignora "SEM HORÁRIO").
-    const gruposComHora =
-    gruposHora.filter(g => g.label !== "SEM HORÁRIO");
+    const linhasComHora =
+    linhasAchatadas.filter(l => l.horaLabel !== "SEM HORÁRIO");
 
-    const picoHora =
-    gruposComHora.reduce(
+    const picoLinha =
+    linhasComHora.reduce(
         (max,item) => (!max || item.qtd > max.qtd) ? item : max,
         null
     );
 
     const horasAtivas =
-    gruposComHora.length;
+    linhasComHora.length;
 
     const mediaPorHoraAtiva =
     horasAtivas
@@ -1487,29 +1582,39 @@ async function baixarRelatorioWhatsappHora(){
 
     const maiorQtdHora = Math.max(
         1,
-        ...gruposHora.map(g => g.qtd)
+        ...linhasAchatadas.map(l => l.qtd)
     );
 
     let linhasHtml = "";
 
-    gruposHora.forEach((grupo,indiceGrupo)=>{
+    let indiceDataAtual = -1;
+
+    linhasAchatadas.forEach(item=>{
+
+        if(item.primeiraLinhaData){
+
+            indiceDataAtual++;
+
+        }
 
         const ehPico =
-        picoHora && grupo.label === picoHora.label;
+        picoLinha
+        && item.dataLabel === picoLinha.dataLabel
+        && item.horaLabel === picoLinha.horaLabel;
 
         const bgLinha =
-        indiceGrupo % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
+        indiceDataAtual % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
 
-        const pctGrupo =
+        const pctLinha =
         totalRejeitos
-        ? (grupo.qtd / totalRejeitos * 100)
+        ? (item.qtd / totalRejeitos * 100)
         : 0;
 
         const larguraBarra =
-        Math.max(3, (grupo.qtd / maiorQtdHora) * 100);
+        Math.max(3, (item.qtd / maiorQtdHora) * 100);
 
         const badgesMotivos =
-        grupo.motivos.map(mot=>{
+        item.motivos.map(mot=>{
 
             const cor =
             corMotivo(mot.codigo, mapaCoresMotivo);
@@ -1535,8 +1640,26 @@ async function baixarRelatorioWhatsappHora(){
 
         }).join("");
 
+        const bordaTopoData =
+        item.primeiraLinhaData && indiceDataAtual > 0
+        ? `border-top:2px solid ${BORDA};`
+        : "";
+
         linhasHtml += `
         <tr style="background:${bgLinha};">
+            ${item.primeiraLinhaData ? `
+            <td rowspan="${item.linhasData}" style="
+                padding:8px 12px;
+                text-align:left;
+                vertical-align:top;
+                font-weight:700;
+                font-size:12px;
+                color:${TEXTO_MUTED};
+                border-bottom:1px solid ${BORDA};
+                ${bordaTopoData}
+                white-space:nowrap;
+            ">${item.dataLabel}</td>
+            ` : ""}
             <td style="
                 padding:8px 14px;
                 text-align:left;
@@ -1544,12 +1667,14 @@ async function baixarRelatorioWhatsappHora(){
                 font-size:13px;
                 color:${ehPico ? "#C13B34" : TEXTO};
                 border-bottom:1px solid ${BORDA};
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
                 white-space:nowrap;
-            ">${grupo.label}${ehPico ? " 🔺" : ""}</td>
+            ">${item.horaLabel}${ehPico ? " 🔺" : ""}</td>
             <td style="
                 padding:8px 14px;
                 text-align:left;
                 border-bottom:1px solid ${BORDA};
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
                 line-height:1.6;
             ">${badgesMotivos}</td>
             <td style="
@@ -1559,12 +1684,14 @@ async function baixarRelatorioWhatsappHora(){
                 font-size:13px;
                 color:${TEXTO};
                 border-bottom:1px solid ${BORDA};
-            ">${fmt(grupo.qtd)}</td>
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
+            ">${fmt(item.qtd)}</td>
             <td style="
                 padding:8px 14px;
                 text-align:right;
                 border-bottom:1px solid ${BORDA};
-                width:26%;
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
+                width:24%;
             ">
                 <div style="
                     display:flex;
@@ -1592,7 +1719,7 @@ async function baixarRelatorioWhatsappHora(){
                         color:${TEXTO_MUTED};
                         min-width:40px;
                         text-align:right;
-                    ">${fmtPct(pctGrupo)}</span>
+                    ">${fmtPct(pctLinha)}</span>
                 </div>
             </td>
         </tr>
@@ -1602,7 +1729,7 @@ async function baixarRelatorioWhatsappHora(){
 
     const card = document.createElement("div");
 
-    card.style.width = "640px";
+    card.style.width = "680px";
     card.style.background = "#FFFFFF";
     card.style.fontFamily = "'Inter','Segoe UI',Arial,sans-serif";
     card.style.overflow = "hidden";
@@ -1764,7 +1891,7 @@ async function baixarRelatorioWhatsappHora(){
                     font-weight:600;
                     color:#C13B34;
                     margin-top:4px;
-                ">${picoHora ? picoHora.label : "-"}</div>
+                ">${picoLinha ? picoLinha.dataLabel + " · " + picoLinha.horaLabel : "-"}</div>
             </div>
 
         </div>
@@ -1793,6 +1920,15 @@ async function baixarRelatorioWhatsappHora(){
 
                 <thead>
                     <tr style="background:${GRAFITE};">
+                        <th style="
+                            padding:10px 12px;
+                            text-align:left;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Data</th>
                         <th style="
                             padding:10px 14px;
                             text-align:left;
@@ -1835,7 +1971,7 @@ async function baixarRelatorioWhatsappHora(){
                 <tbody>
                     ${linhasHtml || `
                     <tr>
-                        <td colspan="4" style="
+                        <td colspan="5" style="
                             padding:16px;
                             text-align:center;
                             color:${TEXTO_MUTED};
