@@ -1485,6 +1485,11 @@ async function baixarRelatorioWhatsappHora(){
 
     const mapaCoresMotivo = {};
 
+    const maiorQtdHora = Math.max(
+        1,
+        ...gruposHora.map(g => g.qtd)
+    );
+
     let linhasHtml = "";
 
     gruposHora.forEach((grupo,indiceGrupo)=>{
@@ -1492,7 +1497,7 @@ async function baixarRelatorioWhatsappHora(){
         const ehPico =
         picoHora && grupo.label === picoHora.label;
 
-        const bgGrupo =
+        const bgLinha =
         indiceGrupo % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
 
         const pctGrupo =
@@ -1500,89 +1505,104 @@ async function baixarRelatorioWhatsappHora(){
         ? (grupo.qtd / totalRejeitos * 100)
         : 0;
 
-        const bordaSuperior =
-        indiceGrupo > 0 ? `border-top:2px solid ${BORDA};` : "";
+        const larguraBarra =
+        Math.max(3, (grupo.qtd / maiorQtdHora) * 100);
 
-        grupo.motivos.forEach((mot,indiceMotivo)=>{
+        const badgesMotivos =
+        grupo.motivos.map(mot=>{
 
             const cor =
             corMotivo(mot.codigo, mapaCoresMotivo);
 
-            const pctMotivo =
-            totalRejeitos
-            ? (mot.qtd / totalRejeitos * 100)
-            : 0;
-
-            linhasHtml += `
-            <tr style="background:${bgGrupo};">
-                ${indiceMotivo === 0 ? `
-                <td rowspan="${grupo.motivos.length}" style="
-                    padding:12px 14px;
-                    text-align:left;
-                    vertical-align:top;
-                    font-weight:700;
-                    font-size:14px;
-                    color:${ehPico ? "#C13B34" : TEXTO};
-                    border-bottom:1px solid ${BORDA};
-                    ${bordaSuperior}
-                    white-space:nowrap;
-                ">
-                    <div>${grupo.label}${ehPico ? " 🔺" : ""}</div>
-                    <div style="
-                        margin-top:3px;
-                        font-size:10px;
-                        font-weight:700;
-                        color:${TEXTO_MUTED};
-                    ">${fmt(grupo.qtd)} · ${fmtPct(pctGrupo)}</div>
-                </td>
-                ` : ""}
-                <td style="
-                    padding:9px 14px;
-                    text-align:left;
-                    font-weight:500;
-                    font-size:12.5px;
-                    color:${TEXTO};
-                    border-bottom:1px solid ${BORDA};
-                    ${indiceMotivo === 0 ? bordaSuperior : ""}
-                ">
-                    <span style="
-                        display:inline-block;
-                        width:8px;
-                        height:8px;
-                        border-radius:50%;
-                        background:${cor};
-                        margin-right:8px;
-                    "></span>${mot.label}
-                </td>
-                <td style="
-                    padding:9px 14px;
-                    text-align:center;
-                    font-weight:700;
-                    font-size:12.5px;
-                    color:${TEXTO};
-                    border-bottom:1px solid ${BORDA};
-                    ${indiceMotivo === 0 ? bordaSuperior : ""}
-                ">${fmt(mot.qtd)}</td>
-                <td style="
-                    padding:9px 14px;
-                    text-align:right;
-                    font-weight:600;
-                    font-size:11.5px;
-                    color:${TEXTO_MUTED};
-                    border-bottom:1px solid ${BORDA};
-                    ${indiceMotivo === 0 ? bordaSuperior : ""}
-                    white-space:nowrap;
-                ">${fmtPct(pctMotivo)}</td>
-            </tr>
+            return `
+            <span style="
+                display:inline-flex;
+                align-items:center;
+                gap:4px;
+                margin:0 6px 0 0;
+                font-size:10.5px;
+                font-weight:600;
+                color:${TEXTO_MUTED};
+                white-space:nowrap;
+            "><span style="
+                width:6px;
+                height:6px;
+                border-radius:50%;
+                background:${cor};
+                display:inline-block;
+            "></span>${mot.label}${mot.qtd > 1 ? ` (${mot.qtd})` : ""}</span>
             `;
 
-        });
+        }).join("");
+
+        linhasHtml += `
+        <tr style="background:${bgLinha};">
+            <td style="
+                padding:8px 14px;
+                text-align:left;
+                font-weight:700;
+                font-size:13px;
+                color:${ehPico ? "#C13B34" : TEXTO};
+                border-bottom:1px solid ${BORDA};
+                white-space:nowrap;
+            ">${grupo.label}${ehPico ? " 🔺" : ""}</td>
+            <td style="
+                padding:8px 14px;
+                text-align:left;
+                border-bottom:1px solid ${BORDA};
+                line-height:1.6;
+            ">${badgesMotivos}</td>
+            <td style="
+                padding:8px 14px;
+                text-align:center;
+                font-weight:700;
+                font-size:13px;
+                color:${TEXTO};
+                border-bottom:1px solid ${BORDA};
+            ">${fmt(grupo.qtd)}</td>
+            <td style="
+                padding:8px 14px;
+                text-align:right;
+                border-bottom:1px solid ${BORDA};
+                width:26%;
+            ">
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:flex-end;
+                    gap:6px;
+                ">
+                    <div style="
+                        flex:1;
+                        height:6px;
+                        background:${BORDA};
+                        border-radius:3px;
+                        overflow:hidden;
+                    ">
+                        <div style="
+                            width:${larguraBarra}%;
+                            height:100%;
+                            background:${ehPico ? "#E8564F" : AMBAR};
+                            border-radius:3px;
+                        "></div>
+                    </div>
+                    <span style="
+                        font-size:11px;
+                        font-weight:700;
+                        color:${TEXTO_MUTED};
+                        min-width:40px;
+                        text-align:right;
+                    ">${fmtPct(pctGrupo)}</span>
+                </div>
+            </td>
+        </tr>
+        `;
 
     });
 
     const card = document.createElement("div");
 
-    card.style.width = "720px";
+    card.style.width = "640px";
     card.style.background = "#FFFFFF";
     card.style.fontFamily = "'Inter','Segoe UI',Arial,sans-serif";
     card.style.overflow = "hidden";
