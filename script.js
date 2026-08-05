@@ -1319,34 +1319,79 @@ async function baixarRelatorioWhatsapp(){
 // RELATÓRIO WHATSAPP — REJEITO POR HORA
 // ========================================
 
+function labelMotivo(codigo){
+
+    const encontrado =
+    MOTIVOS_CANONICOS.find(m => m.codigo === codigo);
+
+    return encontrado
+    ? encontrado.label
+    : codigo.replace(/_/g," ");
+
+}
+
 function montarLinhasPorHora(dadosRejeitos){
 
-    const horas =
-    agregarPorHora(dadosRejeitos);
+    const porHora = {};
 
-    const semHorario =
-    dadosRejeitos.filter(d => d.hora === null).length;
+    dadosRejeitos.forEach(item=>{
+
+        const chave = item.hora;
+
+        if(!porHora[chave]){
+
+            porHora[chave] = {};
+
+        }
+
+        porHora[chave][item.codigo] =
+        (porHora[chave][item.codigo] || 0) + 1;
+
+    });
+
+    function montarMotivosTexto(motivosMap){
+
+        return Object.entries(motivosMap)
+        .sort((a,b) => b[1] - a[1])
+        .map(([codigo,qtd]) =>
+            labelMotivo(codigo) + (qtd > 1 ? ` (${qtd})` : "")
+        )
+        .join(", ");
+
+    }
 
     const linhas = [];
 
-    horas.forEach((qtd,hora)=>{
+    for(let hora = 0; hora < 24; hora++){
 
-        if(qtd > 0){
+        const motivosMap = porHora[hora];
+
+        if(motivosMap){
+
+            const qtd =
+            Object.values(motivosMap)
+            .reduce((s,v) => s + v, 0);
 
             linhas.push({
                 label: hora.toString().padStart(2,"0") + "h",
-                qtd
+                qtd,
+                motivos: montarMotivosTexto(motivosMap)
             });
 
         }
 
-    });
+    }
 
-    if(semHorario > 0){
+    if(porHora[null]){
+
+        const qtd =
+        Object.values(porHora[null])
+        .reduce((s,v) => s + v, 0);
 
         linhas.push({
             label: "SEM HORÁRIO",
-            qtd: semHorario
+            qtd,
+            motivos: montarMotivosTexto(porHora[null])
         });
 
     }
@@ -1442,9 +1487,6 @@ async function baixarRelatorioWhatsappHora(){
         ? (item.qtd / totalRejeitos * 100)
         : 0;
 
-        const larguraBarra =
-        Math.max(3, (item.qtd / maiorQtdHora) * 100);
-
         const bgLinha = indice % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
 
         const ehPico =
@@ -1453,56 +1495,41 @@ async function baixarRelatorioWhatsappHora(){
         linhasHtml += `
         <tr style="background:${bgLinha};">
             <td style="
-                padding:10px 16px;
+                padding:10px 14px;
                 text-align:left;
-                font-weight:600;
+                font-weight:700;
                 font-size:13px;
                 color:${TEXTO};
                 border-bottom:1px solid ${BORDA};
+                white-space:nowrap;
             ">${item.label}${ehPico ? " 🔺" : ""}</td>
             <td style="
-                padding:10px 16px;
+                padding:10px 14px;
+                text-align:left;
+                font-weight:500;
+                font-size:11.5px;
+                line-height:1.35;
+                color:${TEXTO_MUTED};
+                border-bottom:1px solid ${BORDA};
+            ">${item.motivos || "-"}</td>
+            <td style="
+                padding:10px 14px;
                 text-align:center;
                 font-weight:700;
                 font-size:13px;
                 color:${TEXTO};
                 border-bottom:1px solid ${BORDA};
+                white-space:nowrap;
             ">${fmt(item.qtd)}</td>
             <td style="
-                padding:10px 16px;
+                padding:10px 14px;
                 text-align:right;
+                font-weight:700;
+                font-size:12px;
+                color:${ehPico ? "#C13B34" : TEXTO_MUTED};
                 border-bottom:1px solid ${BORDA};
-                width:38%;
-            ">
-                <div style="
-                    display:flex;
-                    align-items:center;
-                    justify-content:flex-end;
-                    gap:8px;
-                ">
-                    <div style="
-                        flex:1;
-                        height:7px;
-                        background:${BORDA};
-                        border-radius:4px;
-                        overflow:hidden;
-                    ">
-                        <div style="
-                            width:${larguraBarra}%;
-                            height:100%;
-                            background:${ehPico ? "#E8564F" : AMBAR};
-                            border-radius:4px;
-                        "></div>
-                    </div>
-                    <span style="
-                        font-size:12px;
-                        font-weight:700;
-                        color:${TEXTO_MUTED};
-                        min-width:44px;
-                        text-align:right;
-                    ">${fmtPct(pct)}</span>
-                </div>
-            </td>
+                white-space:nowrap;
+            ">${fmtPct(pct)}</td>
         </tr>
         `;
 
@@ -1510,7 +1537,7 @@ async function baixarRelatorioWhatsappHora(){
 
     const card = document.createElement("div");
 
-    card.style.width = "640px";
+    card.style.width = "720px";
     card.style.background = "#FFFFFF";
     card.style.fontFamily = "'Inter','Segoe UI',Arial,sans-serif";
     card.style.overflow = "hidden";
@@ -1702,7 +1729,7 @@ async function baixarRelatorioWhatsappHora(){
                 <thead>
                     <tr style="background:${GRAFITE};">
                         <th style="
-                            padding:10px 16px;
+                            padding:10px 14px;
                             text-align:left;
                             font-size:11px;
                             font-weight:700;
@@ -1711,7 +1738,16 @@ async function baixarRelatorioWhatsappHora(){
                             color:${AMBAR};
                         ">Hora</th>
                         <th style="
-                            padding:10px 16px;
+                            padding:10px 14px;
+                            text-align:left;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Motivo</th>
+                        <th style="
+                            padding:10px 14px;
                             text-align:center;
                             font-size:11px;
                             font-weight:700;
@@ -1720,21 +1756,21 @@ async function baixarRelatorioWhatsappHora(){
                             color:${AMBAR};
                         ">Qtd</th>
                         <th style="
-                            padding:10px 16px;
+                            padding:10px 14px;
                             text-align:right;
                             font-size:11px;
                             font-weight:700;
                             letter-spacing:.04em;
                             text-transform:uppercase;
                             color:${AMBAR};
-                        ">% do Total</th>
+                        ">%</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     ${linhasHtml || `
                     <tr>
-                        <td colspan="3" style="
+                        <td colspan="4" style="
                             padding:16px;
                             text-align:center;
                             color:${TEXTO_MUTED};
