@@ -2128,3 +2128,597 @@ async function baixarRelatorioWhatsappHora(){
     }
 
 }
+
+
+// ========================================
+// RELATÓRIO WHATSAPP — REJEITO POR HORA (SIMPLES, SEM MOTIVOS)
+// ========================================
+
+async function baixarRelatorioWhatsappHoraSimples(){
+
+    if(!dadosRejeitos.length){
+
+        alert(
+            "Processe os arquivos primeiro."
+        );
+
+        return;
+
+    }
+
+    const cd =
+    document.getElementById("configCD").value || "CD";
+
+    const dataRef =
+    document.getElementById("configData").value || "-";
+
+    const totalRejeitos =
+    dadosRejeitos.length;
+
+    const gruposData =
+    montarGruposPorDataHora(dadosRejeitos);
+
+    // Achata em linhas (data + hora) preservando a ordem cronológica,
+    // guardando quantas linhas cada data ocupa (para o rowspan).
+    const linhasAchatadas = [];
+
+    gruposData.forEach(grupoData=>{
+
+        grupoData.horas.forEach((horaItem,indiceHora)=>{
+
+            linhasAchatadas.push({
+                dataLabel: grupoData.dataLabel,
+                primeiraLinhaData: indiceHora === 0,
+                linhasData: grupoData.horas.length,
+                horaLabel: horaItem.label,
+                qtd: horaItem.qtd
+            });
+
+        });
+
+    });
+
+    // Horário de pico (maior quantidade; ignora "SEM HORÁRIO").
+    const linhasComHora =
+    linhasAchatadas.filter(l => l.horaLabel !== "SEM HORÁRIO");
+
+    const picoLinha =
+    linhasComHora.reduce(
+        (max,item) => (!max || item.qtd > max.qtd) ? item : max,
+        null
+    );
+
+    const horasAtivas =
+    linhasComHora.length;
+
+    const mediaPorHoraAtiva =
+    horasAtivas
+    ? totalRejeitos / horasAtivas
+    : 0;
+
+    const fmt = n => n.toLocaleString("pt-BR");
+
+    const fmtPct = n => n.toLocaleString(
+        "pt-BR",
+        {minimumFractionDigits:2, maximumFractionDigits:2}
+    ) + "%";
+
+    const fmtDec = n => n.toLocaleString(
+        "pt-BR",
+        {minimumFractionDigits:1, maximumFractionDigits:1}
+    );
+
+    // Paleta alinhada ao design system do site.
+    const GRAFITE = "#1D2329";
+    const GRAFITE_2 = "#262E36";
+    const AMBAR = "#F2A93B";
+    const TEXTO = "#1A1D21";
+    const TEXTO_MUTED = "#8B97A3";
+    const BORDA = "#E4E8ED";
+    const LINHA_PAR = "#F7F9FB";
+
+    const maiorQtdHora = Math.max(
+        1,
+        ...linhasAchatadas.map(l => l.qtd)
+    );
+
+    let linhasHtml = "";
+
+    let indiceDataAtual = -1;
+
+    linhasAchatadas.forEach(item=>{
+
+        if(item.primeiraLinhaData){
+
+            indiceDataAtual++;
+
+        }
+
+        const ehPico =
+        picoLinha
+        && item.dataLabel === picoLinha.dataLabel
+        && item.horaLabel === picoLinha.horaLabel;
+
+        const bgLinha =
+        indiceDataAtual % 2 === 0 ? "#FFFFFF" : LINHA_PAR;
+
+        const pctLinha =
+        totalRejeitos
+        ? (item.qtd / totalRejeitos * 100)
+        : 0;
+
+        const larguraBarra =
+        Math.max(3, (item.qtd / maiorQtdHora) * 100);
+
+        const bordaTopoData =
+        item.primeiraLinhaData && indiceDataAtual > 0
+        ? `border-top:2px solid ${BORDA};`
+        : "";
+
+        linhasHtml += `
+        <tr style="background:${bgLinha};">
+            ${item.primeiraLinhaData ? `
+            <td rowspan="${item.linhasData}" style="
+                padding:8px 12px;
+                text-align:left;
+                vertical-align:top;
+                font-weight:700;
+                font-size:12px;
+                color:${TEXTO_MUTED};
+                border-bottom:1px solid ${BORDA};
+                ${bordaTopoData}
+                white-space:nowrap;
+            ">${item.dataLabel}</td>
+            ` : ""}
+            <td style="
+                padding:8px 14px;
+                text-align:left;
+                font-weight:700;
+                font-size:13px;
+                color:${ehPico ? "#C13B34" : TEXTO};
+                border-bottom:1px solid ${BORDA};
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
+                white-space:nowrap;
+            ">${item.horaLabel}${ehPico ? " 🔺" : ""}</td>
+            <td style="
+                padding:8px 14px;
+                text-align:center;
+                font-weight:700;
+                font-size:13px;
+                color:${TEXTO};
+                border-bottom:1px solid ${BORDA};
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
+            ">${fmt(item.qtd)}</td>
+            <td style="
+                padding:8px 14px;
+                text-align:right;
+                border-bottom:1px solid ${BORDA};
+                ${item.primeiraLinhaData ? bordaTopoData : ""}
+                width:38%;
+            ">
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:flex-end;
+                    gap:6px;
+                ">
+                    <div style="
+                        flex:1;
+                        height:6px;
+                        background:${BORDA};
+                        border-radius:3px;
+                        overflow:hidden;
+                    ">
+                        <div style="
+                            width:${larguraBarra}%;
+                            height:100%;
+                            background:${ehPico ? "#E8564F" : AMBAR};
+                            border-radius:3px;
+                        "></div>
+                    </div>
+                    <span style="
+                        font-size:11px;
+                        font-weight:700;
+                        color:${TEXTO_MUTED};
+                        min-width:40px;
+                        text-align:right;
+                    ">${fmtPct(pctLinha)}</span>
+                </div>
+            </td>
+        </tr>
+        `;
+
+    });
+
+    const card = document.createElement("div");
+
+    card.style.width = "560px";
+    card.style.background = "#FFFFFF";
+    card.style.fontFamily = "'Inter','Segoe UI',Arial,sans-serif";
+    card.style.overflow = "hidden";
+    card.style.borderRadius = "16px";
+    card.style.border = `1px solid ${BORDA}`;
+
+    card.innerHTML = `
+
+        <!-- CABEÇALHO -->
+        <div style="
+            background:linear-gradient(135deg, ${GRAFITE} 0%, ${GRAFITE_2} 100%);
+            padding:26px 28px 22px;
+        ">
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+            ">
+                <div>
+                    <div style="
+                        font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                        color:#FFFFFF;
+                        font-size:22px;
+                        font-weight:600;
+                        letter-spacing:.04em;
+                        text-transform:uppercase;
+                        line-height:1.2;
+                    ">⏱️ Rejeito por Hora</div>
+                    <div style="
+                        color:${AMBAR};
+                        font-size:13px;
+                        font-weight:600;
+                        letter-spacing:.05em;
+                        text-transform:uppercase;
+                        margin-top:4px;
+                    ">${cd.toUpperCase()}</div>
+                </div>
+                <div style="
+                    background:rgba(255,255,255,.08);
+                    border:1px solid rgba(255,255,255,.14);
+                    border-radius:10px;
+                    padding:8px 14px;
+                    text-align:center;
+                ">
+                    <div style="
+                        color:${TEXTO_MUTED};
+                        font-size:10px;
+                        font-weight:600;
+                        letter-spacing:.05em;
+                        text-transform:uppercase;
+                    ">Referência</div>
+                    <div style="
+                        color:#FFFFFF;
+                        font-size:15px;
+                        font-weight:700;
+                        margin-top:2px;
+                    ">${dataRef}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPIs -->
+        <div style="
+            display:flex;
+            gap:8px;
+            padding:20px 20px 4px;
+        ">
+
+            <div style="
+                flex:1;
+                background:${LINHA_PAR};
+                border:1px solid ${BORDA};
+                border-radius:12px;
+                padding:12px 8px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:9px;
+                    font-weight:700;
+                    letter-spacing:.04em;
+                    text-transform:uppercase;
+                    color:${TEXTO_MUTED};
+                ">Total Rejeitos</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:21px;
+                    font-weight:600;
+                    color:${TEXTO};
+                    margin-top:4px;
+                ">${fmt(totalRejeitos)}</div>
+            </div>
+
+            <div style="
+                flex:1;
+                background:${LINHA_PAR};
+                border:1px solid ${BORDA};
+                border-radius:12px;
+                padding:12px 8px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:9px;
+                    font-weight:700;
+                    letter-spacing:.04em;
+                    text-transform:uppercase;
+                    color:${TEXTO_MUTED};
+                ">Horas Ativas</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:21px;
+                    font-weight:600;
+                    color:${TEXTO};
+                    margin-top:4px;
+                ">${fmt(horasAtivas)}</div>
+            </div>
+
+            <div style="
+                flex:1;
+                background:${LINHA_PAR};
+                border:1px solid ${BORDA};
+                border-radius:12px;
+                padding:12px 8px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:9px;
+                    font-weight:700;
+                    letter-spacing:.04em;
+                    text-transform:uppercase;
+                    color:${TEXTO_MUTED};
+                ">Média / Hora Ativa</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:21px;
+                    font-weight:600;
+                    color:${TEXTO};
+                    margin-top:4px;
+                ">${fmtDec(mediaPorHoraAtiva)}</div>
+            </div>
+
+            <div style="
+                flex:1;
+                background:#FCE9E8;
+                border:1px solid #FCE9E8;
+                border-radius:12px;
+                padding:12px 8px;
+                text-align:center;
+            ">
+                <div style="
+                    font-size:9px;
+                    font-weight:700;
+                    letter-spacing:.04em;
+                    text-transform:uppercase;
+                    color:#C13B34;
+                ">Pico</div>
+                <div style="
+                    font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                    font-size:21px;
+                    font-weight:600;
+                    color:#C13B34;
+                    margin-top:4px;
+                ">${picoLinha ? picoLinha.dataLabel + " · " + picoLinha.horaLabel : "-"}</div>
+            </div>
+
+        </div>
+
+        <!-- TABELA POR HORA -->
+        <div style="margin:18px 20px 24px;">
+
+            <div style="
+                font-family:'Oswald','Segoe UI',Arial,sans-serif;
+                font-size:13px;
+                font-weight:600;
+                letter-spacing:.04em;
+                text-transform:uppercase;
+                color:${TEXTO};
+                margin-bottom:8px;
+                padding-left:2px;
+            ">Rejeitos por Hora</div>
+
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                border:1px solid ${BORDA};
+                border-radius:10px;
+                overflow:hidden;
+            ">
+
+                <thead>
+                    <tr style="background:${GRAFITE};">
+                        <th style="
+                            padding:10px 12px;
+                            text-align:left;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Data</th>
+                        <th style="
+                            padding:10px 14px;
+                            text-align:left;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Hora</th>
+                        <th style="
+                            padding:10px 14px;
+                            text-align:center;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">Qtd</th>
+                        <th style="
+                            padding:10px 14px;
+                            text-align:right;
+                            font-size:11px;
+                            font-weight:700;
+                            letter-spacing:.04em;
+                            text-transform:uppercase;
+                            color:${AMBAR};
+                        ">%</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    ${linhasHtml || `
+                    <tr>
+                        <td colspan="4" style="
+                            padding:16px;
+                            text-align:center;
+                            color:${TEXTO_MUTED};
+                            font-size:13px;
+                        ">Nenhum rejeito com horário registrado.</td>
+                    </tr>
+                    `}
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <!-- RODAPÉ -->
+        <div style="
+            background:${GRAFITE};
+            padding:10px 20px;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+        ">
+            <span style="
+                color:${TEXTO_MUTED};
+                font-size:10px;
+                font-weight:500;
+            ">Gerado em ${new Date().toLocaleString("pt-BR")}</span>
+            <span style="
+                color:${TEXTO_MUTED};
+                font-size:10px;
+                font-weight:700;
+                letter-spacing:.05em;
+            ">CD-107 · PCP</span>
+        </div>
+
+    `;
+
+    card.style.position = "fixed";
+    card.style.left = "-9999px";
+    card.style.top = "0";
+
+    document.body.appendChild(card);
+
+    const botao =
+    document.getElementById("btnExportarWhatsappHoraSimples");
+
+    const rotuloOriginal =
+    botao ? botao.innerHTML : null;
+
+    const nomeArquivo =
+    `rejeitos-por-hora-simples-${cd.replace(/\s+/g,"-").toLowerCase()}-${dataRef.replace(/\//g,"-")}.png`;
+
+    function baixarBlob(blob){
+
+        const link =
+        document.createElement("a");
+
+        link.download = nomeArquivo;
+
+        link.href =
+        URL.createObjectURL(blob);
+
+        link.click();
+
+        setTimeout(
+            () => URL.revokeObjectURL(link.href),
+            5000
+        );
+
+    }
+
+    try{
+
+        const canvas = await html2canvas(
+            card,
+            {
+                scale: 2,
+                backgroundColor: "#FFFFFF"
+            }
+        );
+
+        const blob = await new Promise(
+            resolve => canvas.toBlob(resolve, "image/png")
+        );
+
+        if(!blob){
+
+            throw new Error(
+                "Falha ao gerar a imagem do relatório."
+            );
+
+        }
+
+        if(navigator.clipboard && window.ClipboardItem){
+
+            try{
+
+                await navigator.clipboard.write([
+                    new ClipboardItem({ "image/png": blob })
+                ]);
+
+                if(botao){
+
+                    botao.innerHTML =
+                    "✅ Copiado! Cole no WhatsApp (Ctrl+V)";
+
+                    setTimeout(()=>{
+
+                        botao.innerHTML = rotuloOriginal;
+
+                    }, 3500);
+
+                }else{
+
+                    alert(
+                        "Relatório copiado! Cole no WhatsApp com Ctrl+V."
+                    );
+
+                }
+
+            }catch(erroClipboard){
+
+                console.error(erroClipboard);
+
+                baixarBlob(blob);
+
+                alert(
+                    "Não foi possível copiar automaticamente. O relatório foi baixado como imagem."
+                );
+
+            }
+
+        }else{
+
+            baixarBlob(blob);
+
+            alert(
+                "Seu navegador não suporta copiar imagens. O relatório foi baixado."
+            );
+
+        }
+
+    }catch(erro){
+
+        console.error(erro);
+
+        alert(
+            "Não foi possível gerar a imagem do relatório."
+        );
+
+    }finally{
+
+        card.remove();
+
+    }
+
+}
